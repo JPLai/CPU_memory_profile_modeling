@@ -1,0 +1,347 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Core Scaling Report</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"></script>
+<style>
+/* Layout: one reading column (max 1040px), sticky draft switcher on top, each draft a stacked sequence of sections */
+:root{
+  --bg:#f5f7f8; --surface:#ffffff; --ink:#14212b; --muted:#566673; --line:#dbe2e6;
+  --accent:#0b7f73; --accent-soft:#dcefec; --warm:#b8731f; --warm-soft:#f6ead9;
+  --display:"Space Grotesk",system-ui,sans-serif; --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f171d; --surface:#16212a; --ink:#e3eaee; --muted:#93a3ae; --line:#26343e;
+  --accent:#3fc2b2; --accent-soft:#163a37; --warm:#e0a352; --warm-soft:#3a2c17; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f171d; --surface:#16212a; --ink:#e3eaee; --muted:#93a3ae; --line:#26343e;
+  --accent:#3fc2b2; --accent-soft:#163a37; --warm:#e0a352; --warm-soft:#3a2c17; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+.wrap{max-width:1040px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+header.bar .wrap{display:flex;flex-wrap:wrap;gap:10px 20px;align-items:center;justify-content:space-between;padding-block:12px}
+.brand{font-family:var(--display);font-weight:600;font-size:15px;letter-spacing:.02em}
+.brand span{color:var(--muted);font-weight:500}
+.tabs{display:flex;gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:3px;flex-wrap:wrap}
+.tabs button{font:500 14px var(--body);color:var(--muted);background:none;border:0;border-radius:7px;padding:6px 12px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+main{padding-block:28px 56px}
+.draft{display:flex;flex-direction:column;gap:40px}
+.eyebrow{font:500 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;line-height:1.2;margin:0}
+h1{font-size:clamp(28px,4.4vw,42px);font-weight:700}
+h2{font-size:24px;font-weight:600}
+h3{font-size:17px;font-weight:600}
+p{margin:0;max-width:68ch}
+.lead{font-size:18px;color:var(--muted);max-width:62ch}
+section{display:flex;flex-direction:column;gap:14px}
+.intro{display:flex;flex-direction:column;gap:12px}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.stat b{font:600 30px var(--display);color:var(--accent);font-variant-numeric:tabular-nums}
+.stat span{font-size:14px;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;min-width:0;display:flex;flex-direction:column;gap:8px}
+.panel .cap{font-size:13.5px;color:var(--muted)}
+.chart{width:100%;height:380px}
+.chart.tall{height:430px}
+.model{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.formula{font:500 15px var(--mono);background:var(--accent-soft);color:var(--ink);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:nowrap}
+.kv{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14px;color:var(--muted)}
+.kv b{color:var(--ink);font-variant-numeric:tabular-nums;font-weight:600}
+.callout{background:var(--warm-soft);color:var(--ink);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:6px}
+.callout h3{color:var(--warm)}
+.note{font-size:14px;color:var(--muted)}
+.steps{display:flex;flex-direction:column;gap:36px}
+.step{display:grid;grid-template-columns:44px minmax(0,1fr);gap:14px}
+.step .num{font:600 15px var(--mono);color:var(--accent);border:1.5px solid var(--accent);border-radius:50%;width:34px;height:34px;display:grid;place-items:center}
+.step .body{display:flex;flex-direction:column;gap:12px;min-width:0}
+.tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{text-align:left;padding:9px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font:500 12px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:0}
+tr.hi td{background:var(--accent-soft)}
+.pill{font:500 12px var(--mono);border-radius:999px;padding:2px 8px;background:var(--accent-soft);color:var(--accent)}
+.pill.warm{background:var(--warm-soft);color:var(--warm)}
+ul.clean{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;max-width:72ch}
+footer{border-top:1px solid var(--line);padding-top:16px;font-size:13px;color:var(--muted)}
+footer code,p code,li code{font-family:var(--mono);font-size:.92em}
+@media (max-width:720px){.stats,.grid2{grid-template-columns:minmax(0,1fr)}.chart{height:340px}.chart.tall{height:380px}.step{grid-template-columns:minmax(0,1fr)}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<header class="bar">
+  <div class="wrap">
+    <div class="brand">Core Scaling Report <span>· Snapdragon X, 12 cores · run 2026‑11‑20</span></div>
+    <div class="tabs" role="tablist" aria-label="Report drafts">
+      <button role="tab" id="tab-a" data-draft="a" aria-selected="true">Report</button>
+      <button role="tab" id="tab-c" data-draft="c" aria-selected="false">Technical summary</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- ================= REPORT (brief + walkthrough) ================= -->
+<div class="draft" id="draft-a" role="tabpanel" aria-labelledby="tab-a">
+  <div class="intro">
+    <div class="eyebrow">Report</div>
+    <h1>Four cores get you about 90% of the speedup</h1>
+    <p class="lead">We timed a CPU-heavy job 1,552 times on a 12-core laptop, varying the number of cores (1–12) and the job size (1–100 units). Repeated runs agree closely, and two simple formulas predict both run time and memory.</p>
+  </div>
+
+  <section class="why">
+    <h2>Why build a model at all</h2>
+    <p>Collecting data is no longer the hard part. The 1,552 runs behind this report took 49 minutes. The code that ran them, with randomized order, crash-safe logging, resume and integrity checks, was built with AI coding help in about a day, along with the analysis. A few years ago that tooling alone was weeks of work, so studies stayed small and models were built on thin data.</p>
+    <p>But a table of 1,552 timings still doesn't answer the questions we care about. A model does.</p>
+    <div class="grid2">
+      <div class="model"><h3>What a model gives you</h3>
+        <ul class="clean">
+          <li><b>An explanation.</b> Time is rounds × cost per round. Memory is idle workers plus busy workers.</li>
+          <li><b>Predictions for runs we never made,</b> instantly. That is what a scheduler or optimizer needs.</li>
+          <li><b>A check on the data.</b> The k = 8 runs stood out because they didn't fit. Their timestamps showed they ran during a load spike.</li>
+          <li><b>Compression.</b> Seven numbers replace 1,552 rows.</li>
+        </ul></div>
+      <div class="model"><h3>What changed, and what didn't</h3>
+        <ul class="clean">
+          <li><b>No longer a blocker:</b> writing the instrumentation, running hundreds of randomized runs, cleaning and checking the data, fitting and plotting.</li>
+          <li><b>Still the real work:</b> deciding what to measure, designing the experiment, and judging whether a result is real.</li>
+          <li>This study shows both. Data collection was clean: every row passed its integrity checks. The one real flaw was a design choice, running each core count in one stretch, and only careful checking caught it.</li>
+        </ul></div>
+    </div>
+    <p>So the work moves from building tools to asking better questions. That makes modeling more useful, not less: we can afford to test more ideas, check them properly, and rerun when something looks wrong.</p>
+  </section>
+
+  <div class="stats">
+    <div class="stat"><b>2–4%</b><span>typical spread between repeated runs, for time and for memory</span></div>
+    <div class="stat"><b>R² 0.99</b><span>both models on scenarios they never saw during fitting</span></div>
+    <div class="stat"><b>89%</b><span>of the total time saving is reached at 4 cores</span></div>
+  </div>
+
+  <section>
+    <h2>Where adding cores stops paying off</h2>
+    <p>For a 100-unit job, going from 1 to 4 cores cuts run time from 16.6 s to 3.3 s. Adding 8 more cores saves only another 1.7 s, about 0.2 s per extra core. When the machine is busy with other work, extra cores past 4 save nothing at all.</p>
+    <div class="panel"><div class="chart" id="sliceA"></div>
+      <div class="cap">Job of 100 units. Green dots are averages of repeated runs under steady load; the line is the time model. Orange shows the same job while other programs were using the CPU.</div></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Cores</th><th class="num">Time, 100 units</th><th class="num">Saved vs 1 core</th><th class="num">Share of total saving</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td class="num">16.6 s</td><td class="num">–</td><td class="num">–</td></tr>
+        <tr><td>2</td><td class="num">6.4 s</td><td class="num">10.2 s</td><td class="num">68%</td></tr>
+        <tr class="hi"><td>4</td><td class="num">3.3 s</td><td class="num">13.3 s</td><td class="num">89%</td></tr>
+        <tr><td>6</td><td class="num">2.4 s</td><td class="num">14.2 s</td><td class="num">94%</td></tr>
+        <tr><td>12</td><td class="num">1.6 s</td><td class="num">15.0 s</td><td class="num">100%</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <div class="steps">
+    <div class="step"><div class="num">1</div><div class="body">
+      <h2>What we measured</h2>
+      <p>One unit of work draws 20 million random numbers (a 160 MB array) and averages them. A job is n units, spread over a pool of k worker processes. For every combination we recorded how long the job took on a wall clock and the peak memory of all the processes together.</p>
+      <div class="kv"><span>Cores <b>1–12</b></span><span>Job size <b>1–100 units</b></span><span>Scenarios <b>194</b></span><span>Repeats each <b>8</b></span><span>Total runs <b>1,552</b></span><span>Duration <b>49 min</b></span></div>
+    </div></div>
+
+    <div class="step"><div class="num">2</div><div class="body">
+      <h2>The measurements repeat closely</h2>
+      <p>When conditions are steady, running the same scenario again gives almost the same answer. For 9 of the 12 core counts, repeated time measurements differ by 7% or less, typically 2–3%. Memory repeats within 6% at every core count.</p>
+      <div class="panel"><div class="chart" id="cvA"></div>
+        <div class="cap">Typical spread between repeated runs (median coefficient of variation), steady-load half of the session. Orange bars mark the three core counts with a few slow outliers.</div></div>
+      <p>The three noisy core counts are explained by when they ran, not by the measurement. k = 1 ran first, right after the run was restarted. k = 8 and k = 11 ran last in the second block, around 20:09, just as background load started rising. Their runs from the first block sit right on the trend line.</p>
+    </div></div>
+
+    <div class="step"><div class="num">3</div><div class="body">
+      <h2>The response surfaces</h2>
+      <p>Time falls steeply as cores are added and grows with job size in steps, because a job runs in rounds of k units. Memory climbs in a straight line with cores and flattens along job size once there are more units than cores.</p>
+      <div class="grid2">
+        <div class="panel"><h3>Run time (s)</h3><div class="chart tall" id="timeA"></div></div>
+        <div class="panel"><h3>Peak memory (MB)</h3><div class="chart tall" id="memA"></div></div>
+      </div>
+      <p class="note">Surfaces show the fitted models; dots are the measured averages. Drag to rotate.</p>
+    </div></div>
+
+    <div class="step"><div class="num">4</div><div class="body">
+      <h2>Two simple models fit the data</h2>
+      <p>Both models come from how the job runs, not from curve fitting. That is why they need only three or four numbers each.</p>
+      <div class="grid2">
+        <div class="model"><h3>Run time: rounds × cost per round</h3>
+          <div class="formula">time = 0.02 + rounds × (0.183 − 0.0214·k + 0.00214·k²)</div>
+          <p class="note">rounds = ceil(n / k). The bracket is the cost of one round, which grows slowly as cores compete for memory bandwidth. Example: 6 cores, 100 units → 17 rounds × 0.13 s ≈ 2.3 s.</p>
+          <div class="kv"><span>Held-out error <b>0.27 s</b></span><span>R² <b>0.991</b></span></div></div>
+        <div class="model"><h3>Peak memory: idle + busy workers</h3>
+          <div class="formula">memory = 128 + 72.7·k + 138.8·min(k, n)  MB</div>
+          <p class="note">Every worker costs about 73 MB just by existing, and each busy worker adds about 140 MB for its data. Example: 6 cores, 100 units → about 1,400 MB.</p>
+          <div class="kv"><span>Held-out error <b>2.3%</b></span><span>R² <b>0.997</b></span></div></div>
+      </div>
+      <p>Errors are measured on 37 scenarios held back from fitting. The simpler forms in the original plan (time from rounds and k, memory from k and n) had 26% and 17% error.</p>
+    </div></div>
+
+    <div class="step"><div class="num">5</div><div class="body">
+      <h2>Limits</h2>
+      <div class="callout">
+        <ul class="clean">
+          <li>About halfway through the session, other programs started using the CPU and runs got about 2.4× slower. The time model uses the steady first half; memory was barely affected.</li>
+          <li>Short jobs (under a second) have larger relative errors, around 19%.</li>
+          <li>The results apply to this machine, 1–12 cores and 1–100 units of 20M numbers.</li>
+          <li>Next run: mix the core counts in time instead of running each one in a single stretch, and log CPU load for each run.</li>
+        </ul>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<!-- ================= DRAFT C ================= -->
+<div class="draft" id="draft-c" role="tabpanel" aria-labelledby="tab-c" hidden>
+  <div class="intro">
+    <div class="eyebrow">Technical summary</div>
+    <h1>Response surfaces and estimators for k = 1–12, n = 1–100</h1>
+    <p class="lead">Full-factorial-style sweep with wave-boundary points, 8 replications per scenario in 4 randomized blocks. Time is modeled on the steady-load blocks (1–2); memory on all blocks.</p>
+  </div>
+
+  <section>
+    <h2>Setup</h2>
+    <div class="tablewrap"><table><tbody>
+      <tr><td>Machine</td><td>Snapdragon X X1E80100, 12 physical cores, 63.5 GB RAM, Windows 11 ARM64, Python 3.12</td></tr>
+      <tr><td>Unit of work</td><td>20,000,000 uniform float64 draws (160 MB), mean returned</td></tr>
+      <tr><td>Factors</td><td>k ∈ 1–12; n ∈ {1, 2, 4, 8, 12, 16, 24, 32, 48, 64, 80, 100} ∪ {k±1, 2k±1, k, 2k}</td></tr>
+      <tr><td>Design</td><td>194 scenarios × 8 reps = 1,552 runs; 4 blocks, shuffled order; pool reused per k with warm-up</td></tr>
+      <tr><td>Responses</td><td>Wall time (perf_counter around the job); peak RSS of parent + workers, sampled every 10 ms</td></tr>
+    </tbody></table></div>
+  </section>
+
+  <section>
+    <h2>Measurement precision</h2>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Response</th><th>Data</th><th class="num">Median CV</th><th>Comment</th></tr></thead>
+      <tbody>
+        <tr><td>Wall time</td><td>Block 1</td><td class="num">2.0%</td><td>Cleanest stretch of the session</td></tr>
+        <tr><td>Wall time</td><td>Blocks 1–2</td><td class="num">3.7%</td><td>k = 2–7, 9, 10: 1.9–4.9%</td></tr>
+        <tr><td>Peak memory</td><td>All blocks</td><td class="num">2.3–3.6%</td><td>Unaffected by load shift</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section>
+    <h2>Chosen models and validation</h2>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Model</th><th>Form</th><th class="num">Held-out RMSE</th><th class="num">MAPE</th><th class="num">Held-out R²</th></tr></thead>
+      <tbody>
+        <tr class="hi"><td><span class="pill">T3 chosen</span></td><td><code>a + b·w + c·w·k + d·w·k²</code>, w = ⌈n/k⌉</td><td class="num">0.266 s</td><td class="num">18.9%</td><td class="num">0.991</td></tr>
+        <tr><td>T1 plan</td><td><code>a + b·w + c·k</code></td><td class="num">0.361 s</td><td class="num">26.0%</td><td class="num">0.983</td></tr>
+        <tr class="hi"><td><span class="pill">M2 chosen</span></td><td><code>a + b·k + c·min(k, n)</code></td><td class="num">38.8 MB</td><td class="num">2.3%</td><td class="num">0.997</td></tr>
+        <tr><td>M1 plan</td><td><code>a + b·k + c·n</code></td><td class="num">231.6 MB</td><td class="num">17.1%</td><td class="num">0.878</td></tr>
+      </tbody></table></div>
+    <div class="grid2">
+      <div class="model"><h3>T3, steady load</h3>
+        <div class="formula">0.0199 + w·(0.1833 − 0.02140·k + 0.002139·k²)</div>
+        <div class="kv"><span>Lack of fit <b>p = 0.41</b></span><span>Noise floor <b>0.42 s</b></span></div></div>
+      <div class="model"><h3>M2, all blocks</h3>
+        <div class="formula">128.2 + 72.65·k + 138.83·min(k, n)</div>
+        <div class="kv"><span>Idle growth measured <b>76.4 MB/core</b></span><span>Array <b>160 MB</b></span></div></div>
+    </div>
+    <p class="note">Held-out set: 37 of 194 scenarios, stratified by k. T3 error is below the replicate noise floor, and the lack-of-fit test finds nothing (p = 0.41). M2 coefficients match independent measurements: idle growth per worker and array size.</p>
+  </section>
+
+  <section>
+    <h2>Surfaces</h2>
+    <div class="grid2">
+      <div class="panel"><h3>Wall time (s), T3</h3><div class="chart tall" id="timeC"></div></div>
+      <div class="panel"><h3>Peak memory (MB), M2</h3><div class="chart tall" id="memC"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Scaling at n = 100</h2>
+    <div class="panel"><div class="chart" id="sliceC"></div></div>
+    <p>Steady load: 16.6 s → 3.3 s by k = 4 (89% of the total reduction); k = 4 → 12 adds 1.7 s, about 0.2 s per extra core. Heavy load (blocks 3–4): the minimum is reached by k ≈ 4–6 and higher k is no faster.</p>
+  </section>
+
+  <section>
+    <h2>Caveats</h2>
+    <ul class="clean">
+      <li>Background CPU load (baseline 19–36%) rose between blocks 2 and 3, slowing runs about 2.4×, most at high k. The regime split was chosen after seeing the data.</li>
+      <li>All runs for one k ran together within a block, so load drift is confounded with k. This explains the k = 8 and k = 11 outliers (end of block 2, 20:08:58–20:10:32) and the slow k = 1 runs (first in block 1, right after restart).</li>
+      <li>Short-job relative error is about 19%; valid for k = 1–12, n = 1–100, 20M draws per unit, this CPU.</li>
+    </ul>
+  </section>
+</div>
+
+<footer>Source: <code>data/run_20M_20261120_194644</code> (measurements.csv, summary.csv, estimators.json, model_comparison.csv). The report and a technical summary of the same study; switch with the tabs above.</footer>
+</main>
+
+<script>
+const D={"pts":[[1,1,0.163,301.9],[1,2,0.3662,306.1],[1,3,0.4472,307.9],[1,4,0.6328,312.4],[1,8,1.285,313.4],[1,12,1.9233,313.9],[1,16,2.4022,315.4],[1,24,4.2153,315.4],[1,32,5.2011,315.5],[1,48,8.4893,315.5],[1,64,10.6707,315.4],[1,80,13.9295,315.5],[1,100,16.6012,315.7],[2,1,0.136,378.2],[2,2,0.1457,512.3],[2,3,0.2565,521.4],[2,4,0.2614,524.2],[2,5,0.4068,537.6],[2,8,0.5124,533.7],[2,12,0.7806,542.3],[2,16,1.0272,546.4],[2,24,1.5223,550.4],[2,32,2.0426,549.8],[2,48,3.0904,542.1],[2,64,4.0673,549.5],[2,80,5.1306,552.0],[2,100,6.4402,540.0],[3,1,0.1322,455.3],[3,2,0.1328,598.0],[3,3,0.134,747.7],[3,4,0.2664,739.9],[3,5,0.2639,744.3],[3,6,0.2659,753.0],[3,7,0.3999,757.3],[3,8,0.3952,754.6],[3,12,0.525,777.6],[3,16,0.783,769.9],[3,24,1.0559,777.8],[3,32,1.4591,776.2],[3,48,2.1058,782.8],[3,64,2.8859,784.7],[3,80,3.5483,782.8],[3,100,4.4467,784.5],[4,1,0.1337,530.4],[4,2,0.1676,659.0],[4,3,0.1376,831.5],[4,4,0.1347,949.4],[4,5,0.261,985.3],[4,7,0.2621,950.9],[4,8,0.2866,956.8],[4,9,0.3948,980.9],[4,12,0.4064,997.2],[4,16,0.536,995.1],[4,24,0.8028,1002.9],[4,32,1.0558,1000.5],[4,48,1.5832,994.7],[4,64,2.1188,998.4],[4,80,2.6167,995.4],[4,100,3.2716,997.6],[5,1,0.1329,619.3],[5,2,0.1311,751.6],[5,4,0.1397,1042.5],[5,5,0.144,1178.6],[5,6,0.2619,1177.4],[5,8,0.272,1179.8],[5,9,0.276,1217.1],[5,10,0.279,1196.2],[5,11,0.4005,1222.8],[5,12,0.399,1204.0],[5,16,0.5237,1215.8],[5,24,0.6682,1207.0],[5,32,0.9262,1228.4],[5,48,1.329,1219.2],[5,64,1.745,1230.3],[5,80,2.1236,1221.1],[5,100,2.6591,1227.8],[6,1,0.1371,688.7],[6,2,0.1342,814.9],[6,4,0.1388,1088.5],[6,5,0.1561,1247.7],[6,6,0.1545,1408.5],[6,7,0.2713,1403.1],[6,8,0.2697,1392.7],[6,11,0.2804,1417.6],[6,12,0.2972,1403.6],[6,13,0.4155,1427.2],[6,16,0.4215,1442.0],[6,24,0.5684,1423.4],[6,32,0.829,1436.4],[6,48,1.1234,1452.0],[6,64,1.5553,1467.3],[6,80,1.9342,1452.9],[6,100,2.3726,1452.7],[7,1,0.1362,759.8],[7,2,0.1391,905.7],[7,4,0.1475,1180.8],[7,6,0.1672,1458.6],[7,7,0.153,1581.0],[7,8,0.2712,1561.2],[7,12,0.2878,1577.2],[7,13,0.2892,1578.2],[7,14,0.3038,1591.2],[7,15,0.4181,1623.3],[7,16,0.4193,1626.4],[7,24,0.5508,1644.6],[7,32,0.7257,1651.1],[7,48,1.0229,1637.3],[7,64,1.4065,1633.5],[7,80,1.695,1651.7],[7,100,2.1159,1637.1],[8,1,0.1935,838.9],[8,2,0.2302,987.5],[8,4,0.3035,1285.4],[8,7,0.3738,1707.3],[8,8,0.4025,1802.4],[8,9,0.6296,1839.2],[8,12,0.9037,1862.0],[8,15,0.6164,1836.3],[8,16,0.5249,1791.7],[8,17,1.2569,1852.9],[8,24,1.5184,1858.2],[8,32,1.432,1839.7],[8,48,1.925,1880.7],[8,64,3.7395,1879.4],[8,80,3.8748,1878.5],[8,100,2.6136,1838.7],[9,1,0.1339,906.8],[9,2,0.1383,1060.6],[9,4,0.1412,1319.0],[9,8,0.1693,1844.9],[9,9,0.1734,2028.5],[9,10,0.2786,2013.5],[9,12,0.2913,1999.6],[9,16,0.3135,2015.4],[9,17,0.3147,2001.3],[9,18,0.3236,2000.3],[9,19,0.4354,2081.7],[9,24,0.462,2049.1],[9,32,0.5926,2069.6],[9,48,0.8952,2099.8],[9,64,1.1883,2070.9],[9,80,1.3886,2113.4],[9,100,1.7972,2114.5],[10,1,0.1485,988.0],[10,2,0.1493,1147.8],[10,4,0.1539,1444.9],[10,8,0.1784,1963.9],[10,9,0.1774,2072.0],[10,10,0.1909,2143.6],[10,11,0.2983,2126.4],[10,12,0.3097,2218.7],[10,16,0.3268,2137.6],[10,19,0.3219,2294.1],[10,20,0.3542,2195.4],[10,21,0.4654,2249.4],[10,24,0.4511,2281.2],[10,32,0.6079,2270.2],[10,48,0.7935,2331.4],[10,64,1.0869,2274.3],[10,80,1.2768,2267.8],[10,100,1.6669,2284.8],[11,1,0.1601,1065.6],[11,2,0.1613,1219.1],[11,4,0.2209,1492.0],[11,8,0.1618,1987.6],[11,10,0.3571,2253.8],[11,11,0.2961,2403.2],[11,12,0.2802,2319.3],[11,16,0.491,2412.6],[11,21,0.4373,2416.9],[11,22,0.3496,2339.8],[11,23,0.4213,2376.6],[11,24,0.7188,2401.8],[11,32,0.4871,2420.3],[11,48,1.0843,2442.4],[11,64,1.5431,2409.6],[11,80,1.2596,2423.2],[11,100,1.9345,2427.6],[12,1,0.1408,1146.6],[12,2,0.1438,1285.2],[12,4,0.1427,1609.1],[12,8,0.1729,2174.2],[12,11,0.1805,2481.9],[12,12,0.2015,2670.5],[12,13,0.297,2646.9],[12,16,0.3117,2639.5],[12,23,0.3625,2686.9],[12,24,0.3804,2668.8],[12,25,0.4629,2695.4],[12,32,0.5188,2622.1],[12,48,0.7049,2676.5],[12,64,0.958,2641.6],[12,80,1.1565,2696.6],[12,100,1.5647,2707.1]],"cvt":{"1":30.8,"2":1.9,"3":2.5,"4":2.4,"5":2.2,"6":2.0,"7":3.5,"8":75.5,"9":2.5,"10":4.9,"11":44.3,"12":6.9},"cvm":{"1":0.3,"2":2.5,"3":2.0,"4":2.5,"5":3.1,"6":3.6,"7":3.5,"8":4.4,"9":4.4,"10":3.9,"11":4.9,"12":5.7},"s100l":{"1":16.601,"2":6.44,"3":4.447,"4":3.272,"5":2.659,"6":2.373,"7":2.116,"8":2.614,"9":1.797,"10":1.667,"11":1.934,"12":1.565},"s100h":{"1":24.005,"2":12.024,"3":10.365,"4":7.476,"5":7.051,"6":6.83,"7":6.168,"8":7.316,"9":8.143,"10":4.408,"11":6.212,"12":8.623},"se100":{"1":2.374,"2":0.06,"3":0.041,"4":0.006,"5":0.026,"6":0.024,"7":0.034,"8":0.419,"9":0.022,"10":0.05,"11":0.45,"12":0.094}};
+
+const TL=[0.01993827862768723,0.18331710037568225,-0.02139725155227947,0.002139289393228544];
+const TH=[-0.09109898035799704,0.2243617056322116,0.009833835017943306,0.0033697357774542147];
+const MM=[128.23334222098126,72.65251163851299,138.82672550284565];
+const tFit=(b,k,n)=>{const w=Math.ceil(n/k);return b[0]+w*(b[1]+b[2]*k+b[3]*k*k)};
+const mFit=(k,n)=>MM[0]+MM[1]*k+MM[2]*Math.min(k,n);
+const K=[...Array(12)].map((_,i)=>i+1), N=[...Array(100)].map((_,i)=>i+1);
+
+function tok(){const s=getComputedStyle(document.documentElement);const g=v=>s.getPropertyValue(v).trim();
+  return{ink:g('--ink'),muted:g('--muted'),line:g('--line'),accent:g('--accent'),warm:g('--warm'),surface:g('--surface'),soft:g('--accent-soft')}}
+const cfg={displayModeBar:false,responsive:true};
+function base2d(t){return{paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'rgba(0,0,0,0)',font:{family:'IBM Plex Sans, system-ui, sans-serif',color:t.ink,size:13},
+  margin:{l:56,r:16,t:16,b:48},xaxis:{gridcolor:t.line,zeroline:false,linecolor:t.line,tickfont:{color:t.muted}},yaxis:{gridcolor:t.line,zeroline:false,linecolor:t.line,tickfont:{color:t.muted}},
+  legend:{orientation:'h',y:1.12,x:0,font:{color:t.muted,size:12}},hoverlabel:{font:{family:'IBM Plex Mono, monospace'}}}}
+function scene(t,z){const ax=(title,extra)=>Object.assign({title:{text:title,font:{color:t.muted,size:12}},gridcolor:t.line,zerolinecolor:t.line,linecolor:t.line,tickfont:{color:t.muted,size:11},backgroundcolor:'rgba(0,0,0,0)',showbackground:false},extra||{});
+  return{xaxis:ax('Cores (k)',{dtick:2}),yaxis:ax('Units per job (n)'),zaxis:ax(z),camera:{eye:{x:1.55,y:-1.55,z:0.9}},aspectmode:'manual',aspectratio:{x:1,y:1.15,z:0.75}}}
+
+function timeSurf(id){const t=tok();
+  const z=N.map(n=>K.map(k=>tFit(TL,k,n)));
+  const pts=D.pts;
+  Plotly.react(id,[
+    {type:'surface',x:K,y:N,z,colorscale:[[0,t.soft],[1,t.accent]],showscale:false,opacity:.9,hovertemplate:'k=%{x}, n=%{y}<br>model %{z:.2f} s<extra></extra>',contours:{z:{show:false}}},
+    {type:'scatter3d',mode:'markers',x:pts.map(p=>p[0]),y:pts.map(p=>p[1]),z:pts.map(p=>p[2]),marker:{size:2.6,color:t.ink},name:'measured',hovertemplate:'k=%{x}, n=%{y}<br>measured %{z:.2f} s<extra></extra>'}
+  ],{paper_bgcolor:'rgba(0,0,0,0)',font:{family:'IBM Plex Sans, system-ui, sans-serif',color:t.ink},margin:{l:0,r:0,t:0,b:0},showlegend:false,scene:scene(t,'Time (s)')},cfg)}
+function memSurf(id){const t=tok();
+  const z=N.map(n=>K.map(k=>mFit(k,n)));const pts=D.pts;
+  Plotly.react(id,[
+    {type:'surface',x:K,y:N,z,colorscale:[[0,t.soft],[1,t.warm]],showscale:false,opacity:.9,hovertemplate:'k=%{x}, n=%{y}<br>model %{z:.0f} MB<extra></extra>',contours:{z:{show:false}}},
+    {type:'scatter3d',mode:'markers',x:pts.map(p=>p[0]),y:pts.map(p=>p[1]),z:pts.map(p=>p[3]),marker:{size:2.6,color:t.ink},hovertemplate:'k=%{x}, n=%{y}<br>measured %{z:.0f} MB<extra></extra>'}
+  ],{paper_bgcolor:'rgba(0,0,0,0)',font:{family:'IBM Plex Sans, system-ui, sans-serif',color:t.ink},margin:{l:0,r:0,t:0,b:0},showlegend:false,scene:Object.assign(scene(t,'Memory (MB)'),{camera:{eye:{x:-1.6,y:-1.5,z:0.85}}})},cfg)}
+function slice(id){const t=tok();const L=base2d(t);
+  const obs=K.map(k=>D.s100l[k]), se=K.map(k=>D.se100[k]), hv=K.map(k=>D.s100h[k]);
+  L.xaxis.title={text:'Cores (k)',font:{color:t.muted}};L.xaxis.dtick=1;L.xaxis.range=[0.5,12.5];
+  L.yaxis.title={text:'Time for 100 units (s)',font:{color:t.muted}};L.yaxis.rangemode='tozero';
+  L.shapes=[{type:'rect',xref:'x',yref:'paper',x0:4,x1:12.5,y0:0,y1:1,fillcolor:t.soft,opacity:.45,line:{width:0},layer:'below'},
+            {type:'line',xref:'x',yref:'paper',x0:4,x1:4,y0:0,y1:1,line:{color:t.accent,width:1.5,dash:'dot'}}];
+  L.annotations=[{x:4.15,y:16.5,xref:'x',yref:'y',xanchor:'left',showarrow:false,align:'left',text:'<b>4 cores: 3.3 s</b><br>89% of the total saving',font:{color:t.accent,size:12.5}},
+                 {x:8.3,y:4.0,xref:'x',yref:'y',showarrow:false,text:'8 more cores save 1.7 s',font:{color:t.muted,size:12}}];
+  Plotly.react(id,[
+    {x:K,y:hv,mode:'lines+markers',name:'Busy machine',line:{color:t.warm,width:1.5,dash:'dash'},marker:{size:6,color:t.warm},hovertemplate:'k=%{x}: %{y:.1f} s<extra>busy</extra>'},
+    {x:K,y:K.map(k=>tFit(TL,k,100)),mode:'lines',name:'Model (steady load)',line:{color:t.accent,width:2.5,shape:'hv'},hovertemplate:'k=%{x}: model %{y:.2f} s<extra></extra>'},
+    {x:K,y:obs,mode:'markers',name:'Measured (steady load)',marker:{size:8,color:t.accent,line:{color:t.surface,width:1.5}},error_y:{type:'data',array:se,color:t.accent,thickness:1.2,width:3},hovertemplate:'k=%{x}: %{y:.2f} s<extra>measured</extra>'}
+  ],L,cfg)}
+function cvChart(id){const t=tok();const L=base2d(t);
+  const noisy=new Set([1,8,11]);const ct=K.map(k=>D.cvt[k]);
+  L.xaxis.title={text:'Cores (k)',font:{color:t.muted}};L.xaxis.dtick=1;
+  L.yaxis.title={text:'Spread between repeats (%)',font:{color:t.muted}};L.yaxis.range=[0,30];
+  L.barmode='group';
+  L.annotations=[1,8,11].map(k=>({x:k,y:29,xref:'x',yref:'y',text:D.cvt[k].toFixed(0)+'% ▲',showarrow:false,font:{color:t.warm,size:11.5}}));
+  Plotly.react(id,[
+    {type:'bar',x:K,y:ct.map(v=>Math.min(v,30)),name:'Run time',marker:{color:K.map(k=>noisy.has(k)?t.warm:t.accent)},customdata:ct,hovertemplate:'k=%{x}: %{customdata:.1f}%<extra>time</extra>'},
+    {type:'bar',x:K,y:K.map(k=>D.cvm[k]),name:'Peak memory',marker:{color:t.muted,opacity:.55},hovertemplate:'k=%{x}: %{y:.1f}%<extra>memory</extra>'}
+  ],L,cfg)}
+
+const charts={a:[['sliceA',slice],['cvA',cvChart],['timeA',timeSurf],['memA',memSurf]],c:[['timeC',timeSurf],['memC',memSurf],['sliceC',slice]]};
+let current='a';
+function render(d){if(!window.Plotly)return;charts[d].forEach(([id,fn])=>{try{fn(id)}catch(e){console.error(e)}})}
+function show(d){if(!charts[d])d='a';current=d;
+  for(const x of ['a','c']){document.getElementById('draft-'+x).hidden=(x!==d);document.getElementById('tab-'+x).setAttribute('aria-selected',x===d?'true':'false')}
+  render(d)}
+document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',()=>{const d=b.dataset.draft;if(location.hash!=='#draft-'+d)location.hash='draft-'+d;else show(d);window.scrollTo(0,0)}));
+function fromHash(){const m=(location.hash||'').match(/^#draft-([abc])$/);show(m?m[1]:'a')}
+window.addEventListener('hashchange',fromHash);
+try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>render(current))}catch(e){}
+new MutationObserver(()=>render(current)).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+fromHash();
+</script>
+
+</body></html>
