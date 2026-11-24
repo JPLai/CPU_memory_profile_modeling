@@ -24,6 +24,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .wrap{max-width:1040px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 header.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
 header.bar .wrap{display:flex;flex-wrap:wrap;gap:10px 20px;align-items:center;justify-content:space-between;padding-block:12px}
+header.bar nav{font-size:14px}
+header.bar nav a{color:var(--accent);text-underline-offset:3px}
+header.bar nav a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .brand{font-family:var(--display);font-weight:600;font-size:15px;letter-spacing:.02em}
 .brand span{color:var(--muted);font-weight:500}
 .tabs{display:flex;gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:3px;flex-wrap:wrap}
@@ -84,6 +87,9 @@ footer code,p code,li code{font-family:var(--mono);font-size:.92em}
       <button role="tab" id="tab-a" data-draft="a" aria-selected="true">Report</button>
       <button role="tab" id="tab-c" data-draft="c" aria-selected="false">Technical summary</button>
     </div>
+    <nav aria-label="Related reports">
+      <a href="core-allocation-at-scale.html">Core Allocation at Scale</a>
+    </nav>
   </div>
 </header>
 

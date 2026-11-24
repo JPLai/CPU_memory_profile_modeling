@@ -1,0 +1,377 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Core Allocation at Scale</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=STIX+Two+Text:ital,wght@0,400;1,400&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"></script>
+<style>
+/* Layout: one reading column (max 1040px) under a sticky title bar; two goals, then profile (goal 1) and the 10,000-task MIP (goal 2) */
+:root{
+  --bg:#f5f7f8; --surface:#ffffff; --ink:#14212b; --muted:#566673; --line:#dbe2e6;
+  --accent:#0b7f73; --accent-soft:#dcefec; --warm:#b8731f; --warm-soft:#f6ead9; --violet:#5b5bb5;
+  --display:"Space Grotesk",system-ui,sans-serif; --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace; --math:"STIX Two Text","Cambria Math",Cambria,"Times New Roman",serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f171d; --surface:#16212a; --ink:#e3eaee; --muted:#93a3ae; --line:#26343e;
+  --accent:#3fc2b2; --accent-soft:#163a37; --warm:#e0a352; --warm-soft:#3a2c17; --violet:#9b9bf0; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f171d; --surface:#16212a; --ink:#e3eaee; --muted:#93a3ae; --line:#26343e;
+  --accent:#3fc2b2; --accent-soft:#163a37; --warm:#e0a352; --warm-soft:#3a2c17; --violet:#9b9bf0; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+.wrap{max-width:1040px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+header.bar .wrap{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;justify-content:space-between;padding-block:12px}
+header.bar nav{font-size:14px}
+header.bar nav a{color:var(--accent);text-underline-offset:3px}
+header.bar nav a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.brand{font-family:var(--display);font-weight:600;font-size:15px;letter-spacing:.02em}
+.brand span{color:var(--muted);font-weight:500}
+.crumbs{font:500 12px var(--mono);color:var(--muted);letter-spacing:.04em}
+main{padding-block:32px 56px;display:flex;flex-direction:column;gap:48px}
+.eyebrow{font:500 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;line-height:1.2;margin:0}
+h1{font-size:clamp(28px,4.4vw,42px);font-weight:700;max-width:22ch}
+h2{font-size:25px;font-weight:600}
+h3{font-size:17px;font-weight:600}
+p{margin:0;max-width:68ch}
+.lead{font-size:18px;color:var(--muted);max-width:64ch}
+section,.intro{display:flex;flex-direction:column;gap:14px}
+.goals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.goal{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.goal .tag{font:500 12px var(--mono);color:var(--accent);letter-spacing:.06em;text-transform:uppercase}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;min-width:0;display:flex;flex-direction:column;gap:8px}
+.cap{font-size:13.5px;color:var(--muted)}
+.chart{width:100%;height:360px}
+.note{font-size:14px;color:var(--muted)}
+/* estimator */
+.est{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:16px;align-items:start}
+.controls{display:flex;flex-direction:column;gap:16px}
+.ctl{display:flex;flex-direction:column;gap:6px}
+.ctl label{font-size:14px;color:var(--muted);display:flex;justify-content:space-between}
+.ctl label b{color:var(--ink);font:600 15px var(--mono)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.seg{display:flex;gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:3px}
+.seg button{flex:1;font:500 13.5px var(--body);color:var(--muted);background:none;border:0;border-radius:6px;padding:6px 8px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.seg button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.readout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.ro{background:var(--bg);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.ro span{font-size:12.5px;color:var(--muted)}
+.ro b{font:600 20px var(--mono);font-variant-numeric:tabular-nums}
+/* math */
+.math{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px;display:flex;flex-direction:column;gap:14px;overflow-x:auto}
+.math .row{display:grid;grid-template-columns:minmax(260px,1fr) minmax(200px,0.9fr);gap:8px 24px;align-items:baseline}
+.eq{font-family:var(--math);font-size:19px;white-space:nowrap}
+.eq i{font-style:italic}
+.eq .op{font-size:22px}
+.why{font-size:14px;color:var(--muted)}
+.math .lbl{font:500 12px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+.math hr{border:0;border-top:1px solid var(--line);margin:2px 0}
+.defs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 24px}
+.defs div{font-size:14.5px}
+.defs .eq{font-size:17px;margin-right:6px}
+.tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{text-align:left;padding:9px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font:500 12px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:0}
+tr.hi td{background:var(--accent-soft)}
+.compare{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.box{border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.box.bad{background:var(--warm-soft)} .box.good{background:var(--accent-soft)}
+.box b.big{font:600 28px var(--display);font-variant-numeric:tabular-nums}
+.box.bad b.big{color:var(--warm)} .box.good b.big{color:var(--accent)}
+.words{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px 20px;display:flex;flex-direction:column}
+.wrow{display:grid;grid-template-columns:120px minmax(0,1fr);gap:16px;padding:14px 0;border-bottom:1px solid var(--line);font-size:16px}
+.wrow:last-child{border-bottom:0}
+.wlbl{font:600 15px var(--display);color:var(--accent)}
+.clist{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
+@media (max-width:560px){.wrow{grid-template-columns:minmax(0,1fr);gap:4px}}
+.tldr{background:var(--accent-soft);border-radius:12px;padding:18px 20px;display:flex;flex-direction:column;gap:8px}
+.tldr .tlbl{font:600 13px var(--mono);letter-spacing:.08em;color:var(--accent)}
+.tgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 24px}
+.titem{display:flex;flex-direction:column;gap:2px;min-width:0}
+.titem b{font:600 16.5px var(--display)}
+.titem span{font-size:15px;color:var(--muted)}
+@media (max-width:620px){.tgrid{grid-template-columns:minmax(0,1fr)}}
+.kvgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.kvgrid div{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.kvgrid span{font-size:12.5px;color:var(--muted)}
+.kvgrid b{font-weight:600;font-size:15px}
+@media (max-width:620px){.kvgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+ul.clean{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;max-width:72ch}
+footer{border-top:1px solid var(--line);padding-top:16px;font-size:13px;color:var(--muted)}
+code{font-family:var(--mono);font-size:.92em}
+@media (max-width:760px){.goals,.grid2,.est,.compare,.defs{grid-template-columns:minmax(0,1fr)}.math .row{grid-template-columns:minmax(0,1fr)}.chart{height:320px}}
+@media (max-width:620px){.crumbs{display:none}.brand span{display:none}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<header class="bar">
+  <div class="wrap">
+    <div class="brand">Core Allocation at Scale <span>· Snapdragon X, 12 cores</span></div>
+    <div class="crumbs">Step 1: measure → <b>Step 2: profile &amp; optimize</b> → Step 3: schedule</div>
+    <nav aria-label="Related reports">
+      <a href="index.html">Core Scaling Report</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="intro">
+    <div class="eyebrow">Step 2 of the core scaling study</div>
+    <h1>Know a task's profile, and 10,000 tasks become an easy optimization</h1>
+    <p class="lead">Step 1 measured how run time and memory change with cores and task size, and fit two simple models. Step 2 puts those models to work.</p>
+  </div>
+
+  <div class="tldr">
+    <div class="tlbl">TL;DR</div>
+    <div class="tgrid">
+      <div class="titem"><b>Look it up, don't test it</b><span>Two formulas give any task's time and memory.</span></div>
+      <div class="titem"><b>10,000 tasks in milliseconds</b><span>Group by size: 1,000 choices, not 100,000.</span></div>
+      <div class="titem"><b>Faster tasks, longer batch</b><span>19% faster per task = 55% longer overall.</span></div>
+      <div class="titem"><b>Size the fleet</b><span>10,000 tasks an hour needs 4+ machines. Wait times still need simulation.</span></div>
+    </div>
+  </div>
+
+  <div class="goals">
+    <div class="goal"><div class="tag">Goal 1</div><h3>A profile makes estimates deterministic</h3>
+      <p>With the task–CPU–memory profile, the time and memory of any task are a lookup, not a measurement. You know the cost before you run it.</p></div>
+    <div class="goal"><div class="tag">Goal 2</div><h3>The profile makes 10,000 tasks easy</h3>
+      <p>Choosing cores for one task is trivial. For 10,000 tasks of different sizes, the profile turns the decision into a small integer program that solves in milliseconds.</p></div>
+  </div>
+
+  <!-- ============ GOAL 1 ============ -->
+  <section>
+    <div class="eyebrow">Goal 1</div>
+    <h2>The task–CPU–memory profile</h2>
+    <p>A profile is the cost of a task for every combination of size n (1–100 units) and cores k (1–12): its run time, its peak memory, and the core-time and memory-time it uses. All 1,200 cells come from two formulas fitted in step 1.</p>
+    <div class="math" style="gap:10px">
+      <div class="row"><div class="eq"><i>t</i>(<i>n</i>,<i>k</i>) = <i>a</i> + ⌈<i>n</i>/<i>k</i>⌉ · (<i>b</i> + <i>c k</i> + <i>d k</i>²)</div><div class="why">Run time: rounds of k units at a time, times the cost of one round.</div></div>
+      <div class="row"><div class="eq"><i>m</i>(<i>n</i>,<i>k</i>) = 128 + 72.7 <i>k</i> + 138.8 · min(<i>k</i>, <i>n</i>) &nbsp;MB</div><div class="why">Memory: a base, every idle worker, every busy worker's data.</div></div>
+    </div>
+    <p>The constants a–d have one set of values for a steady machine and one for a busy machine. Either way, the estimate is fixed by n and k, not drawn from new measurements. That is what "deterministic" means here.</p>
+    <p>How close the lookup is depends on the machine. On a steady machine, repeated runs agree within about 2–4%. On a busy machine, they vary by about 12%, so estimates are rougher.</p>
+
+    <div class="panel">
+      <h3>Try the profile</h3>
+      <div class="est">
+        <div class="controls">
+          <div class="ctl"><label for="nIn">Task size n <b id="nOut">60</b></label><input type="range" id="nIn" min="1" max="100" value="60"></div>
+          <div class="ctl"><label for="kIn">Cores k <b id="kOut">4</b></label><input type="range" id="kIn" min="1" max="12" value="4"></div>
+          <div class="ctl"><label>Machine load</label>
+            <div class="seg" role="group" aria-label="Machine load"><button id="ldL" aria-pressed="false">Steady</button><button id="ldH" aria-pressed="true">Busy</button></div></div>
+          <div class="readout">
+            <div class="ro"><span>Run time</span><b id="roT">–</b></div>
+            <div class="ro"><span>Peak memory</span><b id="roM">–</b></div>
+            <div class="ro"><span>Core-time</span><b id="roC">–</b></div>
+            <div class="ro"><span>Rounds</span><b id="roR">–</b></div>
+          </div>
+        </div>
+        <div style="min-width:0"><div class="chart" id="estChart" style="height:330px"></div>
+          <div class="cap">Run time for this task size at every core count. The highlighted point is your choice; the dotted line is the fastest option.</div></div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="panel"><h3>Run time profile</h3><div class="chart" id="heatT"></div>
+        <div class="cap">Seconds, for the load chosen above (log color scale). Bands are the rounds: time jumps when n passes a multiple of k.</div></div>
+      <div class="panel"><h3>Memory profile</h3><div class="chart" id="heatM"></div>
+        <div class="cap">Peak MB. Set by cores once the task has more units than cores.</div></div>
+    </div>
+  </section>
+
+  <!-- ============ ONE TASK ============ -->
+  <section>
+    <div class="eyebrow">One task</div>
+    <h2>Estimating one task is simple</h2>
+    <p>For one task, read the profile row for its size and pick the best of 12 core counts. A 100-unit task on a busy machine runs fastest at 8 cores (6.7 s), uses the least core-time at 1 core (23.7 core-seconds), and stops getting faster after about 5–6 cores. No solver needed.</p>
+  </section>
+
+  <!-- ============ GOAL 2 ============ -->
+  <section>
+    <div class="eyebrow">Goal 2</div>
+    <h2>What if 10,000 tasks arrive, all different sizes?</h2>
+    <p>Now every task needs a core count, they all share 12 cores and a memory budget, and each choice costs core-time and memory-time while faster tasks earn a reward. Choosing per task looks like a huge problem. The profile shrinks it.</p>
+    <div class="compare">
+      <div class="box bad"><span>Decide task by task</span><b class="big">100,000</b><span>binary variables: 10,000 tasks × 10 options (4–12 cores, or not run)</span></div>
+      <div class="box good"><span>Decide by size, using the profile</span><b class="big">1,000</b><span>integer variables: 100 sizes × 10 options. Tasks of the same size have the same profile, so they face the same choice.</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>The model in words</h2>
+    <div class="words">
+      <div class="wrow"><div class="wlbl">Decide</div><div>For each task, how many cores it gets, or whether it runs at all in this window.</div></div>
+      <div class="wrow"><div class="wlbl">Maximize</div><div>The award for every task finished, where a faster finish earns more,<br><b>minus</b> the cost of the core-time it uses,<br><b>minus</b> the cost of the memory-time it uses.</div></div>
+      <div class="wrow"><div class="wlbl">Subject to</div><div>
+        <ol class="clist">
+          <li><b>One choice per task.</b> Every task picks exactly one option: a core count, or "not run".</li>
+          <li><b>Max run time.</b> A task can't take an option that would run longer than the time limit.</li>
+          <li><b>Core bounds.</b> A task gets between the minimum and maximum cores allowed, for example 4 to 12.</li>
+          <li><b>Memory bound per task.</b> A task can't take an option that needs more memory than one task is allowed.</li>
+          <li><b>The machine's limits.</b> All the core-time used fits in 12 cores over the time window, and all the memory-time fits in the memory budget.</li>
+        </ol></div></div>
+    </div>
+    <p>Rules 2–4 don't need equations: they just remove options from the list before solving. Only rules 1 and 5 tie the tasks together.</p>
+  </section>
+
+  <section>
+    <h2>The same model in math</h2>
+    <div class="math">
+      <div class="lbl">Sets and data</div>
+      <div class="defs">
+        <div><span class="eq"><i>n</i> ∈ {1,…,100}</span> task sizes</div>
+        <div><span class="eq"><i>k</i> ∈ <i>K</i> = {0, <i>k</i><sub>min</sub>,…,<i>k</i><sub>max</sub>}</span> core options; 0 = not run</div>
+        <div><span class="eq"><i>N<sub>n</sub></i></span> number of tasks of size n</div>
+        <div><span class="eq"><i>t<sub>nk</sub></i>, <i>m<sub>nk</sub></i></span> run time and memory, from the profile</div>
+        <div><span class="eq"><i>R</i>, ρ</span> award per finished task; award lost per second of run time</div>
+        <div><span class="eq">α, β</span> cost per core-second, per GB-second</div>
+        <div><span class="eq"><i>T</i><sub>max</sub>, <i>M</i><sub>task</sub></span> run-time limit and memory limit per task</div>
+        <div><span class="eq"><i>C</i> = 12, <i>M</i>, <i>H</i></span> cores, memory budget (GB), time window (s)</div>
+      </div>
+      <hr>
+      <div class="lbl">Net value of one size-n task on k cores (precomputed)</div>
+      <div class="row"><div class="eq"><i>v<sub>nk</sub></i> = (<i>R</i> − ρ · <i>t<sub>nk</sub></i>) − α · <i>k</i> · <i>t<sub>nk</sub></i> − β · <i>m<sub>nk</sub></i> · <i>t<sub>nk</sub></i>, &nbsp;&nbsp;<i>v<sub>n</sub></i><sub>0</sub> = 0</div>
+        <div class="why">Award for finishing (less for slower runs), minus core-time cost, minus memory-time cost. Not running earns and costs nothing.</div></div>
+      <hr>
+      <div class="lbl">Variables</div>
+      <div class="row"><div class="eq"><i>x<sub>nk</sub></i> ∈ ℤ<sub>≥0</sub></div>
+        <div class="why">How many size-n tasks take option k.</div></div>
+      <hr>
+      <div class="lbl">Model</div>
+      <div class="row"><div class="eq">max &nbsp;<i>Z</i> = <span class="op">∑</span><sub><i>n</i></sub> <span class="op">∑</span><sub><i>k</i></sub> <i>v<sub>nk</sub></i> <i>x<sub>nk</sub></i></div>
+        <div class="why">Total award minus total cost.</div></div>
+      <div class="row"><div class="eq"><span class="op">∑</span><sub><i>k</i>∈<i>K</i></sub> <i>x<sub>nk</sub></i> = <i>N<sub>n</sub></i> &nbsp;&nbsp;for every <i>n</i></div>
+        <div class="why">1. One choice per task.</div></div>
+      <div class="row"><div class="eq"><i>x<sub>nk</sub></i> = 0 &nbsp;if&nbsp; <i>t<sub>nk</sub></i> &gt; <i>T</i><sub>max</sub></div>
+        <div class="why">2. Max run time.</div></div>
+      <div class="row"><div class="eq"><i>k</i><sub>min</sub> ≤ <i>k</i> ≤ <i>k</i><sub>max</sub> &nbsp;for every option run</div>
+        <div class="why">3. Core bounds (built into the set K).</div></div>
+      <div class="row"><div class="eq"><i>x<sub>nk</sub></i> = 0 &nbsp;if&nbsp; <i>m<sub>nk</sub></i> &gt; <i>M</i><sub>task</sub></div>
+        <div class="why">4. Memory bound per task.</div></div>
+      <div class="row"><div class="eq"><span class="op">∑</span><sub><i>n</i></sub> <span class="op">∑</span><sub><i>k</i></sub> <i>k</i> · <i>t<sub>nk</sub></i> · <i>x<sub>nk</sub></i> ≤ <i>C</i> · <i>H</i></div>
+        <div class="why">5a. Core-time fits in 12 cores over the window.</div></div>
+      <div class="row"><div class="eq"><span class="op">∑</span><sub><i>n</i></sub> <span class="op">∑</span><sub><i>k</i></sub> <i>m<sub>nk</sub></i> · <i>t<sub>nk</sub></i> · <i>x<sub>nk</sub></i> ≤ <i>M</i> · <i>H</i></div>
+        <div class="why">5b. Memory-time fits in the budget over the window.</div></div>
+    </div>
+    <p>Everything nonlinear (the rounds, the k², the min) lives inside t and m, which the profile computes ahead of time. What's left is linear. The per-task version, with a binary y<sub>jk</sub> for each task, gives the same answer with 100 times more variables.</p>
+    <p class="note">The "not run" option is what makes "tasks finished" matter: when the window is too short for everything, the model picks which tasks are worth running. If every task must run, drop it; the award is then the same for every plan, and the model becomes "minimize cost". The capacity rules treat cores and memory as averages over the window. Packing whole tasks onto cores, and their order, is step 3.</p>
+  </section>
+
+  <section>
+    <h2>Solved: 10,000 tasks</h2>
+    <p>This example is the every-task-must-run case. There is no "not run" option, and instead of a fixed window, each second of makespan has a price γ.</p>
+    <div class="kvgrid">
+      <div><span>Tasks</span><b>10,000, sizes 1–100</b></div>
+      <div><span>Profile</span><b>Busy machine</b></div>
+      <div><span>Cores per task</span><b>4–12</b></div>
+      <div><span>Memory budget</span><b>8 GB</b></div>
+      <div><span>Prices (illustrative)</span><b>α 1, β 0.25, γ 12</b></div>
+      <div><span>Solve time</span><b>5–40 ms, 0% gap</b></div>
+    </div>
+    <p class="note">α per core-second, β per GB-second, γ per second of makespan. Solved with HiGHS through SciPy. The LP relaxation was already integral, so the integer answer matched it exactly.</p>
+    <div class="panel"><div class="chart" id="kChart"></div>
+      <div class="cap">Cores chosen for each task size, at three values of the run-time reward ρ. One choice per size.</div></div>
+    <p>With no reward, almost every size gets the minimum of 4 cores, the most efficient option. As the reward grows, sizes move up to 5–9 cores, and core counts that divide a task's size evenly are favored (a 7-unit task on 7 cores runs in one round).</p>
+    <div class="grid2">
+      <div class="panel"><div class="chart" id="frontier"></div>
+        <div class="cap">Each point is one solve. Raising the reward buys shorter tasks with a longer total run.</div></div>
+      <div class="tablewrap"><table>
+        <thead><tr><th class="num">Reward ρ</th><th class="num">Avg cores</th><th class="num">Avg run time</th><th class="num">Makespan</th><th class="num">Core-hours</th></tr></thead>
+        <tbody id="sweepRows"></tbody></table></div>
+    </div>
+    <p>The trade-off is steep. Cutting average task run time by 19% (4.0 s to 3.3 s) stretches the makespan by 55% (3.7 h to 5.8 h), because extra cores per task are used less efficiently. Past ρ ≈ 50, tasks barely get faster while the batch keeps getting longer.</p>
+    <p>Memory matters once it is tight. Lowering the budget from 8 GB to 2.4 GB leaves the core choices nearly unchanged but stretches the makespan from 3.7 h to 4.5 h, because fewer tasks fit in memory at once.</p>
+  </section>
+
+  <section>
+    <h2>From the profile to capacity planning</h2>
+    <p>If you collect the task profile by hour, meaning how many tasks of each size arrive each hour, this same model tells you how many machines you need and how fast you can process the work. Set the time window to one hour, feed in that hour's task counts, and read off the core-time and memory-time the best plan needs.</p>
+    <div class="compare">
+      <div class="box good"><span>Machines needed</span><b class="big">≥ 4</b><span>10,000 tasks an hour like these need about 45 core-hours per hour at 4 cores per task: 3.7 machines of 12 cores running flat out.</span></div>
+      <div class="box good"><span>Throughput per machine</span><b class="big">~2,700</b><span>tasks an hour per 12-core machine, at the most efficient core choice.</span></div>
+    </div>
+    <p>These are lower bounds: they assume every core is busy all the time. Real queues need headroom.</p>
+    <p>What the model can't tell you is the order tasks run in and how long each one waits. Scheduling and wait-time estimates still need to go back to simulation, using the profile as the simulation's input.</p>
+  </section>
+
+  <section>
+    <h2>Limits and next step</h2>
+    <ul class="clean">
+      <li>The profile was measured with one task on the machine at a time. With 10,000 tasks the machine is always full, and tasks running together may slow each other. A short concurrency test should come before trusting these numbers.</li>
+      <li>The busy-machine profile is used here because the steady-load profile has an inflated 1-core value from the first minutes of the run. Its estimates are rougher (about 12% run-to-run spread).</li>
+      <li>Run time here means time spent running. If waiting time matters, the order of tasks matters too.</li>
+      <li><b>Step 3:</b> turn the size → cores table into a real schedule, simulate it, and measure the gap from this MIP.</li>
+    </ul>
+  </section>
+
+  <footer>Profile from <code>data/run_20M_20261120_194644/estimators.json</code> (1,552 runs, step 1). Solved instance: 10,000 tasks, seed 7, SciPy 1.18 milp (HiGHS). Prices are illustrative.</footer>
+</main>
+
+<script>
+const P={"N":[96,104,74,98,93,102,110,93,88,102,97,105,102,115,82,94,99,98,99,112,101,104,93,111,107,113,120,108,103,113,100,107,99,110,91,84,114,122,114,100,105,97,101,102,116,90,102,82,92,110,92,96,74,106,83,98,94,98,91,100,97,90,106,85,93,97,104,98,91,109,104,104,93,104,102,105,114,92,79,102,96,92,110,102,116,103,102,109,117,107,88,105,92,98,100,89,110,87,98,104],"sweep":[{"rho":0,"H":3.731,"run":4.02,"coreh":44.78,"kavg":4.06},{"rho":1,"H":3.731,"run":4.02,"coreh":44.78,"kavg":4.06},{"rho":2,"H":3.733,"run":4.014,"coreh":44.79,"kavg":4.09},{"rho":5,"H":3.751,"run":3.971,"coreh":45.01,"kavg":4.22},{"rho":10,"H":3.877,"run":3.823,"coreh":46.53,"kavg":4.53},{"rho":15,"H":4.153,"run":3.623,"coreh":49.84,"kavg":5.06},{"rho":20,"H":4.341,"run":3.53,"coreh":52.09,"kavg":5.36},{"rho":30,"H":4.573,"run":3.441,"coreh":54.88,"kavg":5.82},{"rho":50,"H":4.902,"run":3.364,"coreh":58.82,"kavg":6.28},{"rho":80,"H":5.221,"run":3.317,"coreh":62.65,"kavg":6.69},{"rho":120,"H":5.569,"run":3.283,"coreh":66.82,"kavg":7.23},{"rho":200,"H":5.769,"run":3.271,"coreh":69.23,"kavg":7.57}],"ks":{"0":[4,4,4,4,5,6,4,4,5,5,4,4,4,4,4,4,4,4,4,4,4,4,4,4,5,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4],"10":[4,4,4,4,5,6,7,4,5,5,4,4,5,5,5,4,6,6,5,5,7,4,4,4,5,4,4,4,5,5,4,4,5,5,5,4,5,5,5,5,6,6,4,4,5,4,4,4,5,5,4,4,5,5,5,4,4,4,4,4,4,4,4,4,5,4,4,4,5,5,4,4,5,5,5,4,4,4,4,4,4,4,4,4,5,4,4,4,5,5,4,4,5,5,5,4,4,4,4,4],"50":[4,4,4,4,5,6,7,8,9,5,6,6,7,7,5,8,6,6,5,5,7,6,6,6,5,7,7,7,6,6,8,8,7,7,7,6,8,8,8,8,6,6,5,5,5,6,6,6,7,5,6,6,6,6,7,7,6,6,6,6,7,7,7,8,6,6,7,7,7,7,6,6,5,5,5,7,7,6,8,8,6,6,6,6,5,6,6,6,6,6,7,6,6,6,6,6,7,7,6,6]}};
+const TL=[0.01993827862768723,0.18331710037568225,-0.02139725155227947,0.002139289393228544];
+const TH=[-0.09109898035799704,0.2243617056322116,0.009833835017943306,0.0033697357774542147];
+const MM=[128.23334222098126,72.65251163851299,138.82672550284565];
+const tF=(b,k,n)=>b[0]+Math.ceil(n/k)*(b[1]+b[2]*k+b[3]*k*k);
+const mF=(k,n)=>MM[0]+MM[1]*k+MM[2]*Math.min(k,n);
+const K=[...Array(12)].map((_,i)=>i+1), N=[...Array(100)].map((_,i)=>i+1);
+let load='H';
+function tok(){const s=getComputedStyle(document.documentElement);const g=v=>s.getPropertyValue(v).trim();
+  return{ink:g('--ink'),muted:g('--muted'),line:g('--line'),accent:g('--accent'),warm:g('--warm'),violet:g('--violet'),surface:g('--surface'),soft:g('--accent-soft'),bg:g('--bg')}}
+const cfg={displayModeBar:false,responsive:true};
+function base(t){return{paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'rgba(0,0,0,0)',font:{family:'IBM Plex Sans, system-ui, sans-serif',color:t.ink,size:13},
+  margin:{l:56,r:16,t:16,b:48},xaxis:{gridcolor:t.line,zeroline:false,linecolor:t.line,tickfont:{color:t.muted}},yaxis:{gridcolor:t.line,zeroline:false,linecolor:t.line,tickfont:{color:t.muted}},
+  legend:{orientation:'h',y:1.14,x:0,font:{color:t.muted,size:12}},hoverlabel:{font:{family:'IBM Plex Mono, monospace'}}}}
+const fmt=(v,d)=>v.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+
+function estimator(){const t=tok();const n=+nIn.value,k=+kIn.value,b=load==='H'?TH:TL;
+  nOut.textContent=n;kOut.textContent=k;
+  const tt=tF(b,k,n),mm=mF(k,n);
+  roT.textContent=fmt(tt,2)+' s';roM.textContent=fmt(mm,0)+' MB';roC.textContent=fmt(k*tt,1)+' core·s';roR.textContent=Math.ceil(n/k);
+  const ys=K.map(kk=>tF(b,kk,n));const best=K[ys.indexOf(Math.min(...ys))];
+  const L=base(t);L.xaxis.title={text:'Cores (k)',font:{color:t.muted}};L.xaxis.dtick=1;L.yaxis.title={text:'Run time (s)',font:{color:t.muted}};L.yaxis.rangemode='tozero';L.showlegend=false;
+  L.shapes=[{type:'line',xref:'paper',x0:0,x1:1,y0:Math.min(...ys),y1:Math.min(...ys),line:{color:t.muted,width:1,dash:'dot'}}];
+  L.annotations=[{x:best,y:Math.min(...ys),yshift:-14,text:'fastest: '+best,showarrow:false,font:{size:11.5,color:t.muted}}];
+  Plotly.react('estChart',[
+    {x:K,y:ys,mode:'lines+markers',line:{color:t.accent,width:2},marker:{size:6,color:t.accent},hovertemplate:'k=%{x}: %{y:.2f} s<extra></extra>'},
+    {x:[k],y:[tt],mode:'markers',marker:{size:15,color:t.warm,line:{color:t.surface,width:2}},hovertemplate:'your choice<extra></extra>'}
+  ],L,cfg)}
+function heat(id,which){const t=tok();const b=load==='H'?TH:TL;
+  const z=N.map(n=>K.map(k=>which==='t'?Math.log10(tF(b,k,n)):mF(k,n)));
+  const raw=N.map(n=>K.map(k=>which==='t'?tF(b,k,n):mF(k,n)));
+  const L=base(t);L.margin={l:52,r:8,t:8,b:46};L.xaxis.title={text:'Cores (k)',font:{color:t.muted}};L.xaxis.dtick=1;L.yaxis.title={text:'Task size (n)',font:{color:t.muted}};
+  const tv=[0.2,0.5,1,2,5,10,20];
+  Plotly.react(id,[{type:'heatmap',x:K,y:N,z,customdata:raw,
+    colorscale:which==='t'?[[0,t.soft],[0.55,t.accent],[1,t.ink]]:[[0,t.warm+'22'],[1,t.warm]],
+    hovertemplate:which==='t'?'n=%{y}, k=%{x}<br>%{customdata:.2f} s<extra></extra>':'n=%{y}, k=%{x}<br>%{customdata:.0f} MB<extra></extra>',
+    colorbar:which==='t'?{tickvals:tv.map(Math.log10),ticktext:tv.map(String),thickness:10,tickfont:{color:t.muted,size:11},outlinewidth:0,title:{text:'s',font:{color:t.muted}}}:{thickness:10,tickfont:{color:t.muted,size:11},outlinewidth:0,title:{text:'MB',font:{color:t.muted}}}
+  }],L,cfg)}
+function kChart(){const t=tok();const L=base(t);
+  L.xaxis.title={text:'Task size (n)',font:{color:t.muted}};L.yaxis.title={text:'Cores chosen (k)',font:{color:t.muted}};L.yaxis.dtick=1;L.yaxis.range=[3.5,9.5];
+  const ser=[['0','No reward (ρ = 0)',t.muted,6],['10','ρ = 10',t.accent,6],['50','ρ = 50',t.warm,6]];
+  Plotly.react('kChart',ser.map(([r,name,c,s],i)=>({x:N,y:P.ks[r].map(v=>v+(i-1)*0.12),customdata:P.ks[r],mode:'markers',name,marker:{size:s,color:c},hovertemplate:'n=%{x}: %{customdata} cores<extra>'+name+'</extra>'})),L,cfg)}
+function frontier(){const t=tok();const L=base(t);const s=P.sweep.filter(r=>r.rho!==1);
+  L.xaxis.title={text:'Makespan (hours)',font:{color:t.muted}};L.yaxis.title={text:'Avg task run time (s)',font:{color:t.muted}};L.showlegend=false;
+  L.annotations=s.filter(r=>[0,10,20,50,200].includes(r.rho)).map(r=>({x:r.H,y:r.run,text:'ρ='+r.rho,showarrow:false,xshift:r.rho===0?24:20,yshift:8,font:{size:11.5,color:t.muted}}));
+  Plotly.react('frontier',[{x:s.map(r=>r.H),y:s.map(r=>r.run),mode:'lines+markers',line:{color:t.accent,width:2},marker:{size:8,color:t.accent,line:{color:t.surface,width:1.5}},customdata:s.map(r=>r.rho),hovertemplate:'ρ=%{customdata}<br>makespan %{x:.2f} h<br>avg run %{y:.2f} s<extra></extra>'}],L,cfg)}
+function rows(){document.getElementById('sweepRows').innerHTML=P.sweep.filter(r=>[0,5,10,20,50,200].includes(r.rho)).map(r=>
+  `<tr${r.rho===0?' class="hi"':''}><td class="num">${r.rho}</td><td class="num">${fmt(r.kavg,2)}</td><td class="num">${fmt(r.run,2)} s</td><td class="num">${fmt(r.H,2)} h</td><td class="num">${fmt(r.coreh,1)}</td></tr>`).join('')}
+function renderAll(){if(!window.Plotly)return;try{estimator();heat('heatT','t');heat('heatM','m');kChart();frontier()}catch(e){console.error(e)}}
+const nIn=document.getElementById('nIn'),kIn=document.getElementById('kIn'),nOut=document.getElementById('nOut'),kOut=document.getElementById('kOut'),
+      roT=document.getElementById('roT'),roM=document.getElementById('roM'),roC=document.getElementById('roC'),roR=document.getElementById('roR');
+nIn.addEventListener('input',()=>window.Plotly&&estimator());kIn.addEventListener('input',()=>window.Plotly&&estimator());
+function setLoad(l){load=l;ldL.setAttribute('aria-pressed',l==='L');ldH.setAttribute('aria-pressed',l==='H');if(window.Plotly){estimator();heat('heatT','t')}}
+const ldL=document.getElementById('ldL'),ldH=document.getElementById('ldH');ldL.addEventListener('click',()=>setLoad('L'));ldH.addEventListener('click',()=>setLoad('H'));
+rows();renderAll();
+try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',renderAll)}catch(e){}
+new MutationObserver(renderAll).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+</script>
+
+</body></html>
